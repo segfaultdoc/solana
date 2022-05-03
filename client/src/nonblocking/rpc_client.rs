@@ -1352,11 +1352,13 @@ impl RpcClient {
         } else {
             self.default_cluster_transaction_encoding().await?
         };
-        let commitment = config.commitment.unwrap_or_default();
-        let commitment = self.maybe_map_commitment(commitment).await?;
+
+        // TODO(seg): fix
+        // let commitment = config.commitment.unwrap_or_default();
+        // let commitment = self.maybe_map_commitment(commitment).await?;
         let config = RpcSimulateTransactionConfig {
             encoding: Some(encoding),
-            commitment: Some(commitment),
+            commitment: config.commitment,
             ..config
         };
         let serialized_encoded = serialize_and_encode::<Transaction>(transaction, encoding)?;
