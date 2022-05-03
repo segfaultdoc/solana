@@ -42,6 +42,7 @@ pub struct RpcSimulateTransactionConfig {
     pub commitment: Option<CommitmentConfig>,
     pub encoding: Option<UiTransactionEncoding>,
     pub accounts: Option<RpcSimulateTransactionAccountsConfig>,
+    pub slot: Option<Slot>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]

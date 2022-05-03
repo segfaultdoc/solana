@@ -206,6 +206,12 @@ pub struct JsonRpcRequestProcessor {
 impl Metadata for JsonRpcRequestProcessor {}
 
 impl JsonRpcRequestProcessor {
+    fn bank_from_slot(&self, slot: Slot) -> Option<Arc<Bank>> {
+        debug!("Slot: {:?}", slot);
+        let r_bank_forks = self.bank_forks.read().unwrap();
+        r_bank_forks.get(slot).cloned()
+    }
+
     #[allow(deprecated)]
     fn bank(&self, commitment: Option<CommitmentConfig>) -> Arc<Bank> {
         debug!("RPC commitment_config: {:?}", commitment);
@@ -3603,7 +3609,28 @@ pub mod rpc_full {
             let (_, mut unsanitized_tx) =
                 decode_and_deserialize::<VersionedTransaction>(data, binary_encoding)?;
 
-            let bank = &*meta.bank(config.commitment);
+            let bank = {
+                if let Some(slot) = config.slot {
+                    if config.commitment.is_some() {
+                        return Err(Error::invalid_params(
+                            "slot may not be used with commitment",
+                        ));
+                    }
+
+                    if let Some(bank) = meta.bank_from_slot(slot) {
+                        bank
+                    } else {
+                        return Err(Error::invalid_params(format!(
+                            "failed fetch bank for slot {}",
+                            slot
+                        )));
+                    }
+                } else {
+                    meta.bank(config.commitment)
+                }
+            };
+            let bank = &*bank;
+
             if config.replace_recent_blockhash {
                 if config.sig_verify {
                     return Err(Error::invalid_params(
