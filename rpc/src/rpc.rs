@@ -185,6 +185,8 @@ impl Default for RpcBigtableConfig {
 
 #[derive(Clone)]
 pub struct JsonRpcRequestProcessor {
+    // TODO: hacky way to avoid pruning of bank while we loadtest
+    cached_banks: HashMap<Slot, Arc<Bank>>,
     bank_forks: Arc<RwLock<BankForks>>,
     block_commitment_cache: Arc<RwLock<BlockCommitmentCache>>,
     blockstore: Arc<Blockstore>,
@@ -206,10 +208,24 @@ pub struct JsonRpcRequestProcessor {
 impl Metadata for JsonRpcRequestProcessor {}
 
 impl JsonRpcRequestProcessor {
-    fn bank_from_slot(&self, slot: Slot) -> Option<Arc<Bank>> {
+    // TODO: hacky for purposes of load test
+    fn bank_from_slot(&mut self, slot: Slot) -> Option<Arc<Bank>> {
         debug!("Slot: {:?}", slot);
-        let r_bank_forks = self.bank_forks.read().unwrap();
-        r_bank_forks.get(slot).cloned()
+        if let Some(bank) = self.cached_banks.get(&slot).cloned() {
+            Some(bank)
+        } else {
+            let r_bank_forks = self.bank_forks.read().unwrap();
+            let bank = r_bank_forks.get(slot);
+
+            if let Some(bank) = bank {
+                if self.cached_banks.len() > 10 {
+                    self.cached_banks.clear();
+                }
+                self.cached_banks.insert(slot, bank.clone());
+            }
+
+            bank.cloned()
+        }
     }
 
     #[allow(deprecated)]
@@ -301,6 +317,7 @@ impl JsonRpcRequestProcessor {
         let (sender, receiver) = unbounded();
         (
             Self {
+                cached_banks: HashMap::new(),
                 config,
                 snapshot_config,
                 bank_forks,
@@ -349,6 +366,7 @@ impl JsonRpcRequestProcessor {
         );
 
         Self {
+            cached_banks: HashMap::new(),
             config: JsonRpcConfig::default(),
             snapshot_config: None,
             bank_forks,
@@ -3593,7 +3611,7 @@ pub mod rpc_full {
 
         fn simulate_transaction(
             &self,
-            meta: Self::Metadata,
+            mut meta: Self::Metadata,
             data: String,
             config: Option<RpcSimulateTransactionConfig>,
         ) -> Result<RpcResponse<RpcSimulateTransactionResult>> {
