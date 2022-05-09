@@ -3671,7 +3671,7 @@ pub mod rpc_full {
                 logs,
                 post_simulation_accounts,
                 units_consumed,
-            } = bank.simulate_transaction(transaction);
+            } = bank.simulate_transaction_unchecked(transaction);
 
             let accounts = if let Some(config_accounts) = config.accounts {
                 let accounts_encoding = config_accounts
